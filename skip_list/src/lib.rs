@@ -75,7 +75,7 @@ impl<T: Clone> SkipList<T> {
         match self.head {
             Some(ref head) => {
                 let mut start_level = self.max_level;
-                let node = head.clone();
+                let mut node = head.clone();
                 let mut result = None;
 
                 loop {
@@ -85,19 +85,17 @@ impl<T: Clone> SkipList<T> {
                     start_level -= 1;
                 }
 
-                let mut n = node;
-
                 for level in (0..=start_level).rev() {
                     loop {
-                        let next = n.clone();
+                        let next = node.clone();
                         match next.borrow().next[level] {
-                            Some(ref next) if next.borrow().id <= id => n = next.clone(),
+                            Some(ref next) if next.borrow().id <= id => node = next.clone(),
                             _ => break,
                         };
                     }
 
-                    if n.borrow().id == id {
-                        result = Some(n.borrow().data.clone());
+                    if node.borrow().id == id {
+                        result = Some(node.borrow().data.clone());
                         break;
                     }
                 }
@@ -128,9 +126,9 @@ impl<T: Clone> Iter<T> {
 }
 
 impl<T: Clone> Iterator for Iter<T> {
-   type Item = (u64, T);
+    type Item = (u64, T);
 
-   fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<Self::Item> {
         let current = &self.current;
         let mut result = None;
 
