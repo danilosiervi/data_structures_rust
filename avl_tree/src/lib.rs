@@ -126,7 +126,7 @@ fn remove<T: Ord>(tree: &mut Tree<T>, value: &T) -> bool {
                 *tree = match (node.left.take(), node.right.take()) {
                     (None, None) => None,
                     (Some(b), None) | (None, Some(b)) => Some(b),
-                    (Some(left), Some(right)) => some(merge(left, right)),
+                    (Some(left), Some(right)) => Some(merge(left, right)),
                 };
 
                 return true;
@@ -253,7 +253,7 @@ impl Not for Side {
 }
 
 impl<T: Ord> FromIterator<T> for AvlTree<T> {
-    fn from_iter<T: IntoIterator<Item=T>>(iter: T) -> Self {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let mut tree = AvlTree::new();
 
         for value in iter {
@@ -265,11 +265,11 @@ impl<T: Ord> FromIterator<T> for AvlTree<T> {
 }
 
 struct NodeIter<'a, T: Ord> {
-    stack: Vec<&'a AvlTree<T>>,
+    stack: Vec<&'a Node<T>>,
 }
 
 impl<'a, T: Ord> Iterator for NodeIter<'a, T> {
-    type Item = &'a AvlTree<T>;
+    type Item = &'a Node<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(node) = self.stack.pop() {
@@ -287,7 +287,7 @@ impl<'a, T: Ord> Iterator for NodeIter<'a, T> {
     }
 }
 
-struct Iter<'a, T: Ord> {
+pub struct Iter<'a, T: Ord> {
     node_iter: NodeIter<'a, T>,
 }
 
