@@ -1,4 +1,5 @@
 use std::cmp::{max, Ordering};
+use std::iter::FromIterator;
 use std::mem;
 use std::ops::Not;
 
@@ -53,6 +54,42 @@ impl<T: Ord> AvlTree<T> {
 
         inserted
     }
+
+    pub fn remove(&mut self, value: &T) -> bool {
+        let removed = remove(&mut self.root, value);
+
+        if removed {
+            self.length -= 1;
+        }
+
+        removed
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.length == 0
+    }
+
+    fn node_iter(&self) -> NodeIter<T> {
+        let cap = self.root.as_ref().map_or(0, |n| n.height);
+
+        let mut node_iter = NodeIter {
+            stack: Vec::with_capacity(cap),
+        };
+
+        let mut child = &self.root;
+        while let Some(node) = child {
+            node_iter.stack.push(node.as_ref());
+            child = &node.left;
+        }
+
+        node_iter
+    }
+
+    pub fn iter(&self) -> Iter<T> {
+        Iter {
+            node_iter: self.node_iter()
+        }
+    }
 }
 
 fn insert<T: Ord>(tree: &mut Tree<T>, value: T) -> bool {
@@ -77,6 +114,60 @@ fn insert<T: Ord>(tree: &mut Tree<T>, value: T) -> bool {
         }));
 
         true
+    }
+}
+
+fn remove<T: Ord>(tree: &mut Tree<T>, value: &T) -> bool {
+    if let Some(node) = tree {
+        let removed = match value.cmp(&node.value) {
+            Ordering::Less => remove(&mut node.left, value),
+            Ordering::Greater => remove(&mut node.right, value),
+            Ordering::Equal => {
+                *tree = match (node.left.take(), node.right.take()) {
+                    (None, None) => None,
+                    (Some(b), None) | (None, Some(b)) => Some(b),
+                    (Some(left), Some(right)) => some(merge(left, right)),
+                };
+
+                return true;
+            }
+        };
+
+        if removed {
+            node.rebalance();
+        }
+
+        removed
+    } else {
+        false
+    }
+}
+
+fn merge<T: Ord>(left: Box<Node<T>>, right: Box<Node<T>>) -> Box<Node<T>> {
+    let mut op_right = Some(right);
+    let mut root = take_min(&mut op_right).unwrap();
+
+    root.left = Some(left);
+    root.right = op_right;
+    root.rebalance();
+
+    root
+}
+
+fn take_min<T: Ord>(tree: &mut Tree<T>) -> Tree<T> {
+    if let Some(mut node) = tree.take() {
+        if let Some(small) = take_min(&mut node.left) {
+            node.rebalance();
+            *tree = Some(node);
+
+            Some(small)
+        } else {
+            *tree = node.right.take();
+
+            Some(node)
+        }
+    } else {
+        None
     }
 }
 
@@ -124,6 +215,30 @@ impl<T: Ord> Node<T> {
         *self.child_mut(side) = Some(subtree);
         self.update_height();
     }
+
+    fn rebalance(&mut self) {
+        self.update_height();
+
+        let side = match self.balance_factor() {
+            -2 => Side::Left,
+            2 => Side::Right,
+            _ => return,
+        };
+
+        let subtree = self.child_mut(side).as_mut().unwrap();
+
+        if let (Side::Left, 1) | (Side::Right, 1) = (side, subtree.balance_factor()) {
+            subtree.rotate(side);
+        }
+
+        self.rotate(!side);
+    }
+}
+
+impl<T: Ord> Default for AvlTree<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Not for Side {
@@ -133,6 +248,56 @@ impl Not for Side {
         match self {
             Side::Left => Side::Right,
             Side::Right => Side::Left,
+        }
+    }
+}
+
+impl<T: Ord> FromIterator<T> for AvlTree<T> {
+    fn from_iter<T: IntoIterator<Item=T>>(iter: T) -> Self {
+        let mut tree = AvlTree::new();
+
+        for value in iter {
+            tree.insert(value);
+        }
+
+        tree
+    }
+}
+
+struct NodeIter<'a, T: Ord> {
+    stack: Vec<&'a AvlTree<T>>,
+}
+
+impl<'a, T: Ord> Iterator for NodeIter<'a, T> {
+    type Item = &'a AvlTree<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(node) = self.stack.pop() {
+            let mut child = &node.right;
+
+            while let Some(subtree) = child {
+                self.stack.push(subtree.as_ref());
+                child = &subtree.left;
+            }
+
+            Some(node)
+        } else {
+            None
+        }
+    }
+}
+
+struct Iter<'a, T: Ord> {
+    node_iter: NodeIter<'a, T>,
+}
+
+impl<'a, T: Ord> Iterator for Iter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.node_iter.next() {
+            Some(node) => Some(&node.value),
+            None => None,
         }
     }
 }
