@@ -1,4 +1,6 @@
-use std::cmp::Ordering;
+use std::cmp::{max, Ordering};
+use std::mem;
+use std::ops::Not;
 
 type Tree<T> = Option<Box<Node<T>>>;
 
@@ -75,5 +77,62 @@ fn insert<T: Ord>(tree: &mut Tree<T>, value: T) -> bool {
         }));
 
         true
+    }
+}
+
+impl<T: Ord> Node<T> {
+    fn child(&self, side: Side) -> &Tree<T> {
+        match side {
+            Side::Left => &self.left,
+            Side::Right => &self.right,
+        }
+    }
+
+    fn child_mut(&mut self, side: Side) -> &mut Tree<T> {
+        match side {
+            Side::Left => &mut self.left,
+            Side::Right => &mut self.right,
+        }
+    }
+
+    fn height(&self, side: Side) -> usize {
+        self.child(side).as_ref().map_or(0, |n| n.height)
+    }
+
+    fn balance_factor(&self) -> i8 {
+        let (left, right) = (self.height(Side::Left), self.height(Side::Right));
+
+        if left < right {
+            (right - left) as i8
+        } else {
+            -((left - right) as i8)
+        }
+    }
+
+    fn update_height(&mut self) {
+        self.height = 1 + max(self.height(Side::Left), self.height(Side::Right));
+    }
+
+    fn rotate(&mut self, side: Side) {
+        let mut subtree = self.child_mut(!side).take().unwrap();
+
+        *self.child_mut(!side) = subtree.child_mut(side).take();
+        self.update_height();
+
+        mem::swap(self, subtree.as_mut());
+
+        *self.child_mut(side) = Some(subtree);
+        self.update_height();
+    }
+}
+
+impl Not for Side {
+    type Output = Side;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Side::Left => Side::Right,
+            Side::Right => Side::Left,
+        }
     }
 }
