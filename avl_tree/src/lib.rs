@@ -227,7 +227,7 @@ impl<T: Ord> Node<T> {
 
         let subtree = self.child_mut(side).as_mut().unwrap();
 
-        if let (Side::Left, 1) | (Side::Right, 1) = (side, subtree.balance_factor()) {
+        if let (Side::Left, 1) | (Side::Right, -1) = (side, subtree.balance_factor()) {
             subtree.rotate(side);
         }
 
